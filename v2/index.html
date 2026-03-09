@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude to Production — Your AI Dev Stack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,800;0,9..144,900;1,9..144,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #FDFAF6;
+      --cream-deep: #F5F0EA;
+      --ink: #1a1a2e;
+      --ink-light: #3d3d56;
+      --muted: #8B8B8B;
+      --rule: #E0DAD0;
+      --coral: #E85D3A;
+      --blue: #2D5BFF;
+      --green: #1A8F6A;
+      --violet: #7C5CFC;
+      --amber: #D4940A;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: var(--coral); color: white; }
+
+    /* Grain */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.5;
+    }
+
+    /* ── CANVAS ── */
+    .canvas {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── TOP BAR ── */
+    .top-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .logo span { color: var(--coral); }
+    .top-links { display: flex; gap: 0.75rem; }
+    .top-link {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      padding: 0.45rem 0.9rem;
+      border: 1px solid var(--rule);
+      border-radius: 100px;
+      transition: all 0.25s;
+      background: rgba(253,250,246,0.85);
+      backdrop-filter: blur(10px);
+    }
+    .top-link:hover { color: var(--ink); border-color: var(--ink); }
+
+    /* ── TITLE (top center) ── */
+    .diagram-title {
+      position: absolute;
+      top: 4.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 10;
+    }
+    .diagram-title h1 {
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      font-weight: 900;
+      letter-spacing: -0.035em;
+      line-height: 1;
+    }
+    .diagram-title h1 em { font-style: italic; font-weight: 600; color: var(--coral); }
+    .diagram-title p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      font-weight: 300;
+      margin-top: 0.35rem;
+    }
+
+    /* ══════════════════════════════════════
+       THE DIAGRAM
+    ══════════════════════════════════════ */
+    .diagram {
+      position: relative;
+      width: min(88vw, 1200px);
+      height: min(72vh, 640px);
+      /* The nodes and arrows are absolute-positioned within this box */
+    }
+
+    /* ── FLOW ARROWS (SVG layer) ── */
+    .arrows-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ── NODE BASE ── */
+    .node {
+      position: absolute;
+      z-index: 5;
+      transition: transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .node:hover { transform: translateY(-4px); z-index: 10; }
+
+    .node-card {
+      background: white;
+      border: 1.5px solid var(--rule);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      position: relative;
+      box-shadow: 0 2px 12px rgba(26,26,46,0.04);
+      transition: box-shadow 0.35s, border-color 0.35s;
+      cursor: default;
+    }
+    .node:hover .node-card {
+      box-shadow: 0 12px 40px rgba(26,26,46,0.1);
+    }
+    .node-accent {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 16px 16px 0 0;
+    }
+    .node-phase {
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .node-phase-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+    .node-icon {
+      font-size: 1.6rem;
+      margin-bottom: 0.5rem;
+      display: block;
+      line-height: 1;
+    }
+    .node-name {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.15rem;
+      line-height: 1.1;
+    }
+    .node-sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 200px;
+    }
+
+    /* Capability pills inside nodes */
+    .node-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      margin-top: 0.65rem;
+    }
+    .node-pill {
+      font-family: var(--font-mono);
+      font-size: 0.54rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      padding: 0.2rem 0.55rem;
+      border-radius: 100px;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+
+    /* ── GROUPED NODE (Claude Desktop) ── */
+    .node-group {
+      background: white;
+      border: 1.5px solid var(--rule);
+      border-radius: 20px;
+      padding: 1.25rem 1.5rem 1rem;
+      box-shadow: 0 2px 12px rgba(26,26,46,0.04);
+      transition: box-shadow 0.35s;
+    }
+    .node:hover .node-group {
+      box-shadow: 0 12px 40px rgba(26,26,46,0.1);
+    }
+    .node-group-label {
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.15rem;
+    }
+    .node-group-sub {
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-bottom: 0.9rem;
+    }
+    .node-group-items {
+      display: flex;
+      gap: 0.6rem;
+    }
+    .group-item {
+      flex: 1;
+      text-align: center;
+      padding: 0.75rem 0.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--rule);
+      transition: all 0.25s;
+      cursor: default;
+      min-width: 80px;
+    }
+    .group-item:hover {
+      border-color: currentColor;
+      transform: translateY(-2px);
+    }
+    .group-item-icon {
+      font-size: 1.3rem;
+      display: block;
+      margin-bottom: 0.35rem;
+    }
+    .group-item-name {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-bottom: 0.1rem;
+    }
+    .group-item-role {
+      font-family: var(--font-mono);
+      font-size: 0.5rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ── LIVE URL NODE (special) ── */
+    .node-url {
+      background: var(--ink);
+      border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 1.1rem 1.5rem;
+      color: var(--cream);
+      box-shadow: 0 4px 20px rgba(26,26,46,0.2);
+      transition: box-shadow 0.35s;
+    }
+    .node:hover .node-url {
+      box-shadow: 0 16px 48px rgba(26,26,46,0.3);
+    }
+    .node-url .node-phase { color: var(--green); }
+    .node-url .node-name { color: var(--cream); }
+    .node-url .node-sub { color: #8B8FA4; }
+    .url-bar {
+      margin-top: 0.65rem;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 0.4rem 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .url-live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── ARROW LABELS ── */
+    .arrow-label {
+      position: absolute;
+      z-index: 6;
+      font-family: var(--font-mono);
+      font-size: 0.56rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--cream);
+      padding: 0.15rem 0.5rem;
+      border-radius: 100px;
+      border: 1px solid var(--rule);
+      white-space: nowrap;
+    }
+
+    /* ── CENTER LABEL ── */
+    .center-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 4;
+      text-align: center;
+      pointer-events: none;
+    }
+    .center-label-ring {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 1.5px dashed var(--rule);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 0.15rem;
+      margin: 0 auto;
+      background: rgba(253,250,246,0.7);
+    }
+    .center-label-icon { font-size: 1.3rem; }
+    .center-label-text {
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── ENTRANCE ANIMATIONS ── */
+    .node {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: nodeIn 0.6s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+    }
+    .node:nth-child(1) { animation-delay: 0.2s; }
+    .node:nth-child(2) { animation-delay: 0.35s; }
+    .node:nth-child(3) { animation-delay: 0.5s; }
+    .node:nth-child(4) { animation-delay: 0.65s; }
+    .node:nth-child(5) { animation-delay: 0.8s; }
+    @keyframes nodeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .arrows-layer {
+      opacity: 0;
+      animation: fadeIn 0.8s ease forwards;
+      animation-delay: 0.6s;
+    }
+    .center-label {
+      opacity: 0;
+      animation: fadeIn 0.6s ease forwards;
+      animation-delay: 0.9s;
+    }
+    .arrow-label {
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+    }
+    .arrow-label:nth-of-type(1) { animation-delay: 0.8s; }
+    .arrow-label:nth-of-type(2) { animation-delay: 0.95s; }
+    .arrow-label:nth-of-type(3) { animation-delay: 1.1s; }
+    .arrow-label:nth-of-type(4) { animation-delay: 1.25s; }
+    .arrow-label:nth-of-type(5) { animation-delay: 1.4s; }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .diagram-title {
+      opacity: 0;
+      animation: titleIn 0.7s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+      animation-delay: 0.05s;
+    }
+    @keyframes titleIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* ── ANIMATED DASHES on arrows ── */
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -20; }
+    }
+    .arrow-animated {
+      animation: dashFlow 1.2s linear infinite;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1000px) {
+      .diagram { transform: scale(0.8); transform-origin: center; }
+    }
+    @media (max-width: 750px) {
+      .diagram { transform: scale(0.6); transform-origin: center; }
+      .diagram-title h1 { font-size: 1.5rem; }
+      .top-bar { padding: 0.75rem 1rem; }
+    }
+    @media (max-width: 500px) {
+      .diagram { transform: scale(0.45); transform-origin: center; }
+    }
+
+    /* ── TOOLTIP on hover ── */
+    .node-card::after, .node-group::after, .node-url::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 18px;
+      border: 2px solid transparent;
+      transition: border-color 0.3s;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <a href="#" class="logo">Claude <span>&rarr;</span> Prod</a>
+    <div class="top-links">
+      <a href="v1/" class="top-link">Interactive version &rarr;</a>
+      <a href="details.html" class="top-link">Full guide &rarr;</a>
+    </div>
+  </div>
+
+  <div class="canvas">
+
+    <!-- TITLE -->
+    <div class="diagram-title">
+      <h1>From idea to <em>live link</em></h1>
+      <p>How Claude AI, GitHub &amp; Vercel connect into one flow</p>
+    </div>
+
+    <!-- ════════════════════════════════════ -->
+    <!-- THE DIAGRAM                         -->
+    <!-- ════════════════════════════════════ -->
+    <div class="diagram" id="diagram">
+
+      <!-- ── SVG ARROWS ── -->
+      <svg class="arrows-layer" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrow-coral" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,4 L0,8 Z" fill="var(--coral)"/>
+          </marker>
+          <marker id="arrow-blue" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,4 L0,8 Z" fill="var(--blue)"/>
+          </marker>
+          <marker id="arrow-ink" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,4 L0,8 Z" fill="var(--ink)"/>
+          </marker>
+          <marker id="arrow-violet" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,4 L0,8 Z" fill="var(--violet)"/>
+          </marker>
+          <marker id="arrow-green" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,4 L0,8 Z" fill="var(--green)"/>
+          </marker>
+        </defs>
+
+        <!-- Arrow 1: Claude Desktop → Claude Code CLI (down) -->
+        <path d="M 270 255 C 270 310, 350 310, 390 350"
+              stroke="var(--coral)" stroke-width="2" fill="none"
+              stroke-dasharray="6 4" class="arrow-animated"
+              marker-end="url(#arrow-coral)" opacity="0.5"/>
+
+        <!-- Arrow 2: Claude Code CLI → Local Git (right) -->
+        <path d="M 570 420 L 700 420"
+              stroke="var(--blue)" stroke-width="2" fill="none"
+              marker-end="url(#arrow-blue)" opacity="0.5"/>
+
+        <!-- Arrow 3: Local Git → GitHub (up-right) -->
+        <path d="M 830 390 C 880 350, 920 300, 940 250"
+              stroke="var(--ink)" stroke-width="2" fill="none"
+              stroke-dasharray="6 4" class="arrow-animated"
+              marker-end="url(#arrow-ink)" opacity="0.4"/>
+
+        <!-- Arrow 4: GitHub → Vercel (down) -->
+        <path d="M 980 220 C 1020 280, 1010 380, 980 430"
+              stroke="var(--violet)" stroke-width="2" fill="none"
+              stroke-dasharray="6 4" class="arrow-animated"
+              marker-end="url(#arrow-violet)" opacity="0.5"/>
+
+        <!-- Arrow 5: Vercel → Live URL (left-down) -->
+        <path d="M 870 530 C 700 570, 450 560, 320 520"
+              stroke="var(--green)" stroke-width="2" fill="none"
+              stroke-dasharray="6 4" class="arrow-animated"
+              marker-end="url(#arrow-green)" opacity="0.5"/>
+      </svg>
+
+      <!-- ── ARROW LABELS ── -->
+      <div class="arrow-label" style="top:28%; left:23%;">generates code</div>
+      <div class="arrow-label" style="top:63%; left:50%;">writes &amp; commits</div>
+      <div class="arrow-label" style="top:43%; left:72%;">git push</div>
+      <div class="arrow-label" style="top:50%; left:82%;">auto-deploys</div>
+      <div class="arrow-label" style="top:83%; left:44%;">shareable link</div>
+
+      <!-- ── CENTER LABEL ── -->
+      <div class="center-label">
+        <div class="center-label-ring">
+          <span class="center-label-icon">&#x1f4bb;</span>
+          <span class="center-label-text">Your machine</span>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════ -->
+      <!-- NODE 1: CLAUDE DESKTOP (top-left) -->
+      <!-- ════════════════════════════════ -->
+      <div class="node" style="top: 3%; left: 1%;">
+        <div class="node-group" style="border-top: 3px solid var(--coral);">
+          <div class="node-group-label">Claude Desktop</div>
+          <div class="node-group-sub">Your creative AI hub</div>
+          <div class="node-group-items">
+            <div class="group-item" style="color: var(--coral);">
+              <span class="group-item-icon">&#x1f4ac;</span>
+              <div class="group-item-name">Chat</div>
+              <div class="group-item-role">Ideate</div>
+            </div>
+            <div class="group-item" style="color: var(--amber);">
+              <span class="group-item-icon">&#x1f91d;</span>
+              <div class="group-item-name">Cowork</div>
+              <div class="group-item-role">Collaborate</div>
+            </div>
+            <div class="group-item" style="color: var(--blue);">
+              <span class="group-item-icon">&#x26a1;</span>
+              <div class="group-item-name">Code</div>
+              <div class="group-item-role">Create</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════ -->
+      <!-- NODE 2: CLAUDE CODE CLI (center-left) -->
+      <!-- ════════════════════════════════ -->
+      <div class="node" style="top: 50%; left: 28%; transform: translateY(-50%);">
+        <div class="node-card" style="min-width: 210px;">
+          <div class="node-accent" style="background: var(--blue);"></div>
+          <div class="node-phase" style="color: var(--blue);">
+            <span class="node-phase-dot" style="background: var(--blue);"></span>
+            Build
+          </div>
+          <span class="node-icon">&#x1f5a5;&#xfe0f;</span>
+          <div class="node-name">Claude Code CLI</div>
+          <div class="node-sub">Terminal AI agent. Writes code, edits files, runs commands.</div>
+          <div class="node-pills">
+            <span class="node-pill" style="border-color: rgba(45,91,255,0.2); color: var(--blue); background: rgba(45,91,255,0.04);">writes files</span>
+            <span class="node-pill" style="border-color: rgba(45,91,255,0.2); color: var(--blue); background: rgba(45,91,255,0.04);">runs tests</span>
+            <span class="node-pill" style="border-color: rgba(45,91,255,0.2); color: var(--blue); background: rgba(45,91,255,0.04);">git commits</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════ -->
+      <!-- NODE 3: LOCAL GIT (center-right) -->
+      <!-- ════════════════════════════════ -->
+      <div class="node" style="top: 50%; left: 57%; transform: translateY(-50%);">
+        <div class="node-card" style="min-width: 180px;">
+          <div class="node-accent" style="background: var(--ink); opacity:0.6;"></div>
+          <div class="node-phase" style="color: var(--ink);">
+            <span class="node-phase-dot" style="background: var(--ink);"></span>
+            Version
+          </div>
+          <span class="node-icon">&#x1f4c1;</span>
+          <div class="node-name">Local Git Repo</div>
+          <div class="node-sub">Project files + version history on your machine.</div>
+          <div class="node-pills">
+            <span class="node-pill" style="border-color: var(--rule); color: var(--ink-light); background: rgba(26,26,46,0.02);">file system</span>
+            <span class="node-pill" style="border-color: var(--rule); color: var(--ink-light); background: rgba(26,26,46,0.02);">git history</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════ -->
+      <!-- NODE 4: GITHUB (top-right) -->
+      <!-- ════════════════════════════════ -->
+      <div class="node" style="top: 5%; right: 2%;">
+        <div class="node-card" style="min-width: 210px;">
+          <div class="node-accent" style="background: var(--ink);"></div>
+          <div class="node-phase" style="color: var(--ink);">
+            <span class="node-phase-dot" style="background: var(--ink);"></span>
+            Share
+          </div>
+          <span class="node-icon">&#x1f419;</span>
+          <div class="node-name">GitHub</div>
+          <div class="node-sub">Cloud home for your code. Version control, collaboration, deploy trigger.</div>
+          <div class="node-pills">
+            <span class="node-pill" style="border-color: var(--rule); color: var(--ink-light); background: rgba(26,26,46,0.02);">repository</span>
+            <span class="node-pill" style="border-color: var(--rule); color: var(--ink-light); background: rgba(26,26,46,0.02);">webhooks</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════ -->
+      <!-- NODE 5: VERCEL (bottom-right) -->
+      <!-- ════════════════════════════════ -->
+      <div class="node" style="bottom: 4%; right: 5%;">
+        <div class="node-card" style="min-width: 210px;">
+          <div class="node-accent" style="background: var(--violet);"></div>
+          <div class="node-phase" style="color: var(--violet);">
+            <span class="node-phase-dot" style="background: var(--violet);"></span>
+            Deploy
+          </div>
+          <span class="node-icon">&#x25b2;</span>
+          <div class="node-name">Vercel</div>
+          <div class="node-sub">Builds, hosts, and scales. Every push = instant deploy.</div>
+          <div class="node-pills">
+            <span class="node-pill" style="border-color: rgba(124,92,252,0.2); color: var(--violet); background: rgba(124,92,252,0.04);">auto-build</span>
+            <span class="node-pill" style="border-color: rgba(124,92,252,0.2); color: var(--violet); background: rgba(124,92,252,0.04);">CDN</span>
+            <span class="node-pill" style="border-color: rgba(124,92,252,0.2); color: var(--violet); background: rgba(124,92,252,0.04);">preview URLs</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════ -->
+      <!-- NODE 6: LIVE URL (bottom-left) -->
+      <!-- ════════════════════════════════ -->
+      <div class="node" style="bottom: 4%; left: 3%;">
+        <div class="node-url">
+          <div class="node-phase">
+            <span class="node-phase-dot" style="background: var(--green);"></span>
+            <span style="color:var(--green);">Live</span>
+          </div>
+          <span class="node-icon">&#x1f310;</span>
+          <div class="node-name">Shareable Link</div>
+          <div class="node-sub">Your project is live. Share the URL with anyone, anywhere.</div>
+          <div class="url-bar">
+            <span class="url-live-dot"></span>
+            https://my-project.vercel.app
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /diagram -->
+
+  </div><!-- /canvas -->
+
+  <script>
+    // Responsive arrow positioning: redraw SVG paths based on actual node positions
+    function updateArrows() {
+      const diagram = document.getElementById('diagram');
+      const rect = diagram.getBoundingClientRect();
+      const nodes = diagram.querySelectorAll('.node');
+
+      // Get node center positions relative to diagram
+      function getNodeCenter(node) {
+        const nr = node.getBoundingClientRect();
+        return {
+          x: ((nr.left + nr.width / 2) - rect.left) / rect.width * 1200,
+          y: ((nr.top + nr.height / 2) - rect.top) / rect.height * 640
+        };
+      }
+      function getNodeEdge(node, side) {
+        const nr = node.getBoundingClientRect();
+        const cx = ((nr.left + nr.width / 2) - rect.left) / rect.width * 1200;
+        const cy = ((nr.top + nr.height / 2) - rect.top) / rect.height * 640;
+        const hw = (nr.width / 2) / rect.width * 1200;
+        const hh = (nr.height / 2) / rect.height * 640;
+        switch(side) {
+          case 'bottom': return { x: cx, y: cy + hh };
+          case 'top': return { x: cx, y: cy - hh };
+          case 'left': return { x: cx - hw, y: cy };
+          case 'right': return { x: cx + hw, y: cy };
+        }
+      }
+    }
+    // Run once on load (arrows are hand-tuned in SVG for the initial layout)
+  </script>
+
+</body>
+</html>

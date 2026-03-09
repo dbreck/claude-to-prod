@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude to Production — Your AI Dev Stack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,800;0,9..144,900;1,9..144,400;1,9..144,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #FDFAF6;
+      --cream-deep: #F5F0EA;
+      --ink: #1a1a2e;
+      --ink-light: #3d3d56;
+      --muted: #8B8B8B;
+      --muted-light: #B8B8B8;
+      --rule: #E0DAD0;
+      --rule-light: #EDE8E0;
+      --coral: #E85D3A;
+      --coral-soft: #F2A48C;
+      --blue: #2D5BFF;
+      --blue-soft: #94ADFF;
+      --green: #1A8F6A;
+      --violet: #7C5CFC;
+      --amber: #D4940A;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.65;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection {
+      background: var(--coral);
+      color: white;
+    }
+
+    /* ── GRAIN OVERLAY ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.5;
+    }
+
+    /* ── LAYOUT ── */
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 2rem; }
+    .container--narrow { max-width: 780px; margin: 0 auto; padding: 0 2rem; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(253,250,246,0.9);
+      backdrop-filter: blur(20px) saturate(1.2);
+      -webkit-backdrop-filter: blur(20px) saturate(1.2);
+      border-bottom: 1px solid var(--rule-light);
+      padding: 0.9rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-mark {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+    .nav-mark span { color: var(--coral); }
+    .nav-links {
+      display: flex;
+      gap: 2.25rem;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--ink); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 92vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      padding: 8rem 2rem 6rem;
+      overflow: hidden;
+    }
+    .hero-deco {
+      position: absolute;
+      top: -20%;
+      right: -10%;
+      width: 70vw;
+      height: 70vw;
+      max-width: 800px;
+      max-height: 800px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 40%, rgba(232,93,58,0.08) 0%, rgba(232,93,58,0.02) 50%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-deco-2 {
+      position: absolute;
+      bottom: -10%;
+      left: -5%;
+      width: 40vw;
+      height: 40vw;
+      max-width: 500px;
+      max-height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 60% 60%, rgba(45,91,255,0.05) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--coral);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      padding: 0.45rem 1rem;
+      border: 1.5px solid rgba(232,93,58,0.25);
+      border-radius: 100px;
+      background: rgba(232,93,58,0.04);
+    }
+    .hero-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--coral);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    h1.hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(3.2rem, 7.5vw, 5.8rem);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      margin-bottom: 2rem;
+      color: var(--ink);
+      font-optical-sizing: auto;
+    }
+    h1.hero-title em {
+      font-style: italic;
+      font-weight: 600;
+      color: var(--coral);
+    }
+    .hero-sub {
+      font-size: 1.2rem;
+      font-weight: 300;
+      color: var(--ink-light);
+      max-width: 480px;
+      line-height: 1.75;
+      margin-bottom: 3rem;
+    }
+    .hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 2rem;
+      background: var(--ink);
+      color: var(--cream);
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 0.88rem;
+      text-decoration: none;
+      border-radius: 100px;
+      transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      letter-spacing: 0.01em;
+    }
+    .hero-cta:hover {
+      background: var(--coral);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(232,93,58,0.2);
+    }
+    .hero-cta svg {
+      transition: transform 0.3s;
+    }
+    .hero-cta:hover svg {
+      transform: translateX(3px);
+    }
+
+    /* ── SECTION SYSTEM ── */
+    .section { padding: 7rem 0; }
+    .section--alt { background: var(--cream-deep); }
+    .section-rule {
+      width: 40px;
+      height: 3px;
+      background: var(--coral);
+      border: none;
+      margin-bottom: 1.5rem;
+      border-radius: 2px;
+    }
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin-bottom: 1rem;
+    }
+    .section-desc {
+      color: var(--muted);
+      font-size: 1.05rem;
+      font-weight: 300;
+      max-width: 520px;
+      line-height: 1.7;
+    }
+    .section-header {
+      margin-bottom: 4rem;
+    }
+
+    /* ── ECOSYSTEM MAP ── */
+    .eco-flow {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin-top: 3rem;
+      position: relative;
+    }
+    .eco-card {
+      flex: 1;
+      padding: 2rem 1.5rem;
+      position: relative;
+      border: 1px solid var(--rule);
+      background: var(--cream);
+      transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .eco-card:first-child { border-radius: 16px 0 0 16px; }
+    .eco-card:last-child { border-radius: 0 16px 16px 0; }
+    .eco-card + .eco-card { border-left: none; }
+    .eco-card:hover {
+      background: white;
+      transform: translateY(-6px);
+      box-shadow: 0 20px 60px rgba(26,26,46,0.08);
+      z-index: 2;
+      border-radius: 16px;
+      border: 1px solid var(--rule);
+    }
+    .eco-phase {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .eco-phase-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .eco-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      display: block;
+      line-height: 1;
+    }
+    .eco-name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.4rem;
+    }
+    .eco-desc {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .eco-connector {
+      position: absolute;
+      right: -14px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 3;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--cream);
+      border: 1.5px solid var(--rule);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+
+    /* Ecosystem bottom row */
+    .eco-bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    .eco-card-wide {
+      padding: 1.75rem 1.5rem;
+      border: 1px solid var(--rule);
+      border-radius: 16px;
+      background: var(--cream);
+      transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+    }
+    .eco-card-wide:hover {
+      background: white;
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(26,26,46,0.07);
+    }
+    .eco-card-wide .eco-icon { margin-bottom: 0; font-size: 1.75rem; flex-shrink: 0; padding-top: 0.15rem; }
+
+    /* ── TOOLS CARDS ── */
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+    .tool-card {
+      border: 1px solid var(--rule);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--cream);
+      transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+    }
+    .tool-card:hover {
+      background: white;
+      transform: translateY(-5px);
+      box-shadow: 0 24px 64px rgba(26,26,46,0.08);
+    }
+    .tool-card--full {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .tool-card--full .tool-card-body { border-left: 1px solid var(--rule); }
+    .tool-accent {
+      height: 3px;
+      width: 100%;
+    }
+    .tool-head {
+      padding: 1.75rem 1.75rem 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .tool-head-left {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .tool-icon-wrap {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+    .tool-name {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .tool-tagline {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .tool-badge {
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      font-weight: 500;
+      padding: 0.25rem 0.65rem;
+      border-radius: 100px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .tool-card-body {
+      padding: 1.25rem 1.75rem 1.75rem;
+    }
+    .tool-desc {
+      font-size: 0.88rem;
+      color: var(--ink-light);
+      line-height: 1.65;
+      margin-bottom: 1.25rem;
+    }
+    .tool-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-bottom: 1.5rem;
+    }
+    .tool-features li {
+      font-size: 0.8rem;
+      color: var(--ink-light);
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      line-height: 1.5;
+    }
+    .tool-features li::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transform: translateY(-1px);
+    }
+    .tool-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--ink);
+      text-decoration: none;
+      padding: 0.45rem 0.9rem;
+      border: 1px solid var(--rule);
+      border-radius: 100px;
+      transition: all 0.2s;
+      letter-spacing: 0.02em;
+    }
+    .tool-link:hover {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: var(--cream);
+    }
+
+    /* Card color theming */
+    .card-chat .tool-accent { background: var(--coral); }
+    .card-chat .tool-icon-wrap { background: rgba(232,93,58,0.08); }
+    .card-chat .tool-badge { background: rgba(232,93,58,0.08); color: var(--coral); }
+    .card-chat .tool-features li::before { background: var(--coral); }
+
+    .card-code .tool-accent { background: var(--blue); }
+    .card-code .tool-icon-wrap { background: rgba(45,91,255,0.08); }
+    .card-code .tool-badge { background: rgba(45,91,255,0.08); color: var(--blue); }
+    .card-code .tool-features li::before { background: var(--blue); }
+
+    .card-cli .tool-accent { background: var(--green); }
+    .card-cli .tool-icon-wrap { background: rgba(26,143,106,0.08); }
+    .card-cli .tool-badge { background: rgba(26,143,106,0.08); color: var(--green); }
+    .card-cli .tool-features li::before { background: var(--green); }
+
+    .card-github .tool-accent { background: var(--ink); }
+    .card-github .tool-icon-wrap { background: rgba(26,26,46,0.06); }
+    .card-github .tool-badge { background: rgba(26,26,46,0.06); color: var(--ink); }
+    .card-github .tool-features li::before { background: var(--ink); }
+
+    .card-vercel .tool-accent { background: var(--violet); }
+    .card-vercel .tool-icon-wrap { background: rgba(124,92,252,0.08); }
+    .card-vercel .tool-badge { background: rgba(124,92,252,0.08); color: var(--violet); }
+    .card-vercel .tool-features li::before { background: var(--violet); }
+
+    .card-cowork .tool-accent { background: var(--amber); }
+    .card-cowork .tool-icon-wrap { background: rgba(212,148,10,0.08); }
+    .card-cowork .tool-badge { background: rgba(212,148,10,0.08); color: var(--amber); }
+    .card-cowork .tool-features li::before { background: var(--amber); }
+
+    /* ── THE FLOW ── */
+    .flow-track {
+      margin-top: 3.5rem;
+      max-width: 680px;
+      position: relative;
+    }
+    .flow-track::before {
+      content: '';
+      position: absolute;
+      left: 27px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--rule);
+    }
+    .flow-step {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 1.75rem;
+      padding-bottom: 3rem;
+      align-items: flex-start;
+      position: relative;
+    }
+    .flow-step:last-child { padding-bottom: 0; }
+    .flow-num {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      z-index: 1;
+      position: relative;
+      border: 2px solid;
+    }
+    .flow-body { padding-top: 0.85rem; }
+    .flow-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .flow-chip {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      font-weight: 500;
+      padding: 0.2rem 0.65rem;
+      border-radius: 100px;
+      letter-spacing: 0.04em;
+    }
+    .flow-text {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .flow-code {
+      margin-top: 0.85rem;
+      background: var(--ink);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      line-height: 1.8;
+      color: #c8d0dc;
+      overflow-x: auto;
+    }
+    .flow-code .comment { color: #5a6577; }
+    .flow-code .cmd { color: #7dd3fc; }
+    .flow-code .str { color: #86efac; }
+
+    /* Step colors */
+    .step-coral .flow-num { border-color: var(--coral); color: var(--coral); background: rgba(232,93,58,0.06); }
+    .step-coral .flow-chip { background: rgba(232,93,58,0.08); color: var(--coral); }
+    .step-amber .flow-num { border-color: var(--amber); color: var(--amber); background: rgba(212,148,10,0.06); }
+    .step-amber .flow-chip { background: rgba(212,148,10,0.08); color: var(--amber); }
+    .step-blue .flow-num { border-color: var(--blue); color: var(--blue); background: rgba(45,91,255,0.06); }
+    .step-blue .flow-chip { background: rgba(45,91,255,0.08); color: var(--blue); }
+    .step-green .flow-num { border-color: var(--green); color: var(--green); background: rgba(26,143,106,0.06); }
+    .step-green .flow-chip { background: rgba(26,143,106,0.08); color: var(--green); }
+    .step-ink .flow-num { border-color: var(--ink); color: var(--ink); background: rgba(26,26,46,0.04); }
+    .step-ink .flow-chip { background: rgba(26,26,46,0.06); color: var(--ink); }
+    .step-violet .flow-num { border-color: var(--violet); color: var(--violet); background: rgba(124,92,252,0.06); }
+    .step-violet .flow-chip { background: rgba(124,92,252,0.08); color: var(--violet); }
+
+    /* ── QUICKSTART ── */
+    .qs-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+    .qs-card {
+      border: 1px solid var(--rule);
+      border-radius: 16px;
+      padding: 2rem;
+      background: white;
+      transition: all 0.3s;
+    }
+    .qs-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 48px rgba(26,26,46,0.06);
+    }
+    .qs-card h4 {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      letter-spacing: -0.01em;
+    }
+    .qs-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .qs-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      list-style: none;
+      counter-reset: qs;
+    }
+    .qs-steps li {
+      counter-increment: qs;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      font-size: 0.84rem;
+      color: var(--ink-light);
+      line-height: 1.55;
+    }
+    .qs-steps li::before {
+      content: counter(qs);
+      min-width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--cream-deep);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      font-weight: 500;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .qs-code {
+      display: inline;
+      background: var(--ink);
+      color: #86efac;
+      border-radius: 4px;
+      padding: 0.15rem 0.45rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+
+    /* ── TIPS ── */
+    .tips-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-top: 3rem;
+    }
+    .tip-card {
+      border: 1px solid var(--rule);
+      border-radius: 16px;
+      padding: 1.75rem;
+      background: white;
+      transition: all 0.3s;
+    }
+    .tip-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 36px rgba(26,26,46,0.06);
+    }
+    .tip-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+    }
+    .tip-title {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.01em;
+    }
+    .tip-text {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ── CALLOUT BANNER ── */
+    .callout {
+      margin-top: 4rem;
+      background: var(--ink);
+      border-radius: 20px;
+      padding: 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .callout::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(232,93,58,0.15), transparent 60%);
+      pointer-events: none;
+    }
+    .callout-text {
+      position: relative;
+      z-index: 1;
+    }
+    .callout-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--cream);
+      letter-spacing: -0.02em;
+      margin-bottom: 0.35rem;
+    }
+    .callout-desc {
+      color: #8B8FA4;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .callout-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.85rem 1.75rem;
+      background: var(--coral);
+      color: white;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-decoration: none;
+      border-radius: 100px;
+      transition: all 0.3s;
+      white-space: nowrap;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .callout-btn:hover {
+      background: #d14e2d;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(232,93,58,0.3);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--rule);
+      padding: 3rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-mark {
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--muted-light);
+    }
+    .footer-text {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--muted-light);
+      letter-spacing: 0.02em;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in {
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.35s; }
+    .delay-4 { animation-delay: 0.5s; }
+
+    /* Scroll reveal */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                  transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .eco-flow { flex-direction: column; gap: 0; }
+      .eco-card:first-child { border-radius: 16px 16px 0 0; }
+      .eco-card:last-child { border-radius: 0 0 16px 16px; }
+      .eco-card + .eco-card { border-left: 1px solid var(--rule); border-top: none; }
+      .eco-connector { display: none; }
+      .eco-bottom-row { grid-template-columns: 1fr; }
+      .tools-grid { grid-template-columns: 1fr; }
+      .tool-card--full { grid-column: auto; display: block; }
+      .tool-card--full .tool-card-body { border-left: none; border-top: 1px solid var(--rule); }
+      .qs-grid { grid-template-columns: 1fr; }
+      .tips-grid { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .callout { flex-direction: column; text-align: center; padding: 2.5rem 2rem; }
+    }
+    @media (max-width: 600px) {
+      .hero { padding: 6rem 1.5rem 4rem; min-height: 80vh; }
+      .section { padding: 4.5rem 0; }
+      .container, .container--narrow { padding: 0 1.5rem; }
+      footer { flex-direction: column; gap: 0.75rem; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-mark">Claude <span>&rarr;</span> Prod</div>
+    <ul class="nav-links">
+      <li><a href="#ecosystem">Ecosystem</a></li>
+      <li><a href="#tools">Tools</a></li>
+      <li><a href="#flow">The Flow</a></li>
+      <li><a href="#start">Get Started</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-deco"></div>
+    <div class="hero-deco-2"></div>
+    <div class="container hero-content">
+      <div class="hero-eyebrow animate-in delay-1">
+        <span class="hero-dot"></span>
+        Your AI Dev Stack
+      </div>
+      <h1 class="hero-title animate-in delay-2">
+        From idea<br>to <em>live link.</em>
+      </h1>
+      <p class="hero-sub animate-in delay-3">
+        Claude AI, GitHub, and Vercel form a connected system that takes you
+        from brainstorming to a shareable URL. Here's how it all fits together.
+      </p>
+      <a href="#ecosystem" class="hero-cta animate-in delay-4">
+        See the ecosystem
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </div>
+  </section>
+
+  <!-- ECOSYSTEM MAP -->
+  <section class="section section--alt" id="ecosystem">
+    <div class="container">
+      <div class="section-header reveal">
+        <hr class="section-rule">
+        <div class="section-label">01 &mdash; The Big Picture</div>
+        <h2 class="section-title">How it all connects</h2>
+        <p class="section-desc">Every tool has a role. Together they cover the full arc from thinking to shipping.</p>
+      </div>
+
+      <!-- Top row: Think → Collaborate → Code -->
+      <div class="eco-flow reveal">
+        <div class="eco-card">
+          <div class="eco-phase" style="color:var(--coral)">
+            <span class="eco-phase-dot" style="background:var(--coral)"></span>
+            Think
+          </div>
+          <span class="eco-icon">&#x1f4ac;</span>
+          <div class="eco-name">Claude.ai Chat</div>
+          <div class="eco-desc">Brainstorm, plan, research, write. Your AI thinking partner &mdash; no code required.</div>
+          <div class="eco-connector">&rarr;</div>
+        </div>
+
+        <div class="eco-card">
+          <div class="eco-phase" style="color:var(--amber)">
+            <span class="eco-phase-dot" style="background:var(--amber)"></span>
+            Collaborate
+          </div>
+          <span class="eco-icon">&#x1f91d;</span>
+          <div class="eco-name">Cowork</div>
+          <div class="eco-desc">Desktop AI assistant for files, tasks, and automation. Claude meets your OS.</div>
+          <div class="eco-connector">&rarr;</div>
+        </div>
+
+        <div class="eco-card">
+          <div class="eco-phase" style="color:var(--blue)">
+            <span class="eco-phase-dot" style="background:var(--blue)"></span>
+            Build
+          </div>
+          <span class="eco-icon">&#x26a1;</span>
+          <div class="eco-name">Claude Code</div>
+          <div class="eco-desc">Agentic coding in your terminal or IDE. Writes, edits, and runs real code on your machine.</div>
+        </div>
+      </div>
+
+      <!-- Bottom row: GitHub + Vercel -->
+      <div class="eco-bottom-row reveal">
+        <div class="eco-card-wide">
+          <span class="eco-icon">&#x1f419;</span>
+          <div>
+            <div class="eco-phase" style="color:var(--ink)">
+              <span class="eco-phase-dot" style="background:var(--ink)"></span>
+              Version &amp; Share
+            </div>
+            <div class="eco-name">GitHub</div>
+            <div class="eco-desc">Store, version, and share your code. The source of truth for everything you build.</div>
+          </div>
+        </div>
+
+        <div class="eco-card-wide">
+          <span class="eco-icon">&#x25b2;</span>
+          <div>
+            <div class="eco-phase" style="color:var(--violet)">
+              <span class="eco-phase-dot" style="background:var(--violet)"></span>
+              Deploy
+            </div>
+            <div class="eco-name">Vercel</div>
+            <div class="eco-desc">Connect your repo and get a live URL instantly. Every push auto-deploys.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOOLS DETAIL -->
+  <section class="section" id="tools">
+    <div class="container">
+      <div class="section-header reveal">
+        <hr class="section-rule">
+        <div class="section-label">02 &mdash; The Tools</div>
+        <h2 class="section-title">What each one does</h2>
+        <p class="section-desc">Each tool covers a different layer. Here's the breakdown.</p>
+      </div>
+
+      <div class="tools-grid">
+
+        <!-- Claude.ai Chat -->
+        <div class="tool-card card-chat reveal">
+          <div class="tool-accent"></div>
+          <div class="tool-head">
+            <div class="tool-head-left">
+              <div class="tool-icon-wrap">&#x1f4ac;</div>
+              <div>
+                <div class="tool-name">Claude.ai Chat</div>
+                <div class="tool-tagline">claude.ai</div>
+              </div>
+            </div>
+            <span class="tool-badge">Browser</span>
+          </div>
+          <div class="tool-card-body">
+            <p class="tool-desc">The web UI you're probably already using. Best for thinking out loud, writing, planning, and anything that doesn't need to touch your files or terminal.</p>
+            <ul class="tool-features">
+              <li>Brainstorm features, content, architecture</li>
+              <li>Ask questions, research topics, get unstuck</li>
+              <li>Draft copy, docs, emails, scripts</li>
+              <li>Review and explain code snippets</li>
+              <li>Create artifacts (mini apps, charts) right in chat</li>
+            </ul>
+            <a class="tool-link" href="https://claude.ai/" target="_blank">Open claude.ai &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Cowork -->
+        <div class="tool-card card-cowork reveal">
+          <div class="tool-accent"></div>
+          <div class="tool-head">
+            <div class="tool-head-left">
+              <div class="tool-icon-wrap">&#x1f91d;</div>
+              <div>
+                <div class="tool-name">Cowork</div>
+                <div class="tool-tagline">Desktop app (beta)</div>
+              </div>
+            </div>
+            <span class="tool-badge">Desktop</span>
+          </div>
+          <div class="tool-card-body">
+            <p class="tool-desc">A desktop app that lets Claude see your screen, open files, and take actions on your computer. Think of it as Claude with hands.</p>
+            <ul class="tool-features">
+              <li>Automate file management and desktop tasks</li>
+              <li>Read and act on files from your local drive</li>
+              <li>Repetitive workflows: rename, organize, convert</li>
+              <li>Works alongside the browser &mdash; no terminal needed</li>
+              <li>Great entry point for non-devs getting into automation</li>
+            </ul>
+            <a class="tool-link" href="https://claude.ai/download" target="_blank">Get Cowork &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Claude Code (IDE) -->
+        <div class="tool-card card-code reveal">
+          <div class="tool-accent"></div>
+          <div class="tool-head">
+            <div class="tool-head-left">
+              <div class="tool-icon-wrap">&#x26a1;</div>
+              <div>
+                <div class="tool-name">Claude Code</div>
+                <div class="tool-tagline">IDE Extension &middot; Agent</div>
+              </div>
+            </div>
+            <span class="tool-badge">IDE + Agent</span>
+          </div>
+          <div class="tool-card-body">
+            <p class="tool-desc">Claude wired into VS Code. It reads your entire codebase, makes multi-file edits, and runs commands &mdash; all from natural language.</p>
+            <ul class="tool-features">
+              <li>Understands your entire project context</li>
+              <li>Edits multiple files in one go</li>
+              <li>Runs tests, installs packages, fixes errors end-to-end</li>
+              <li>Great for prototyping and refactoring</li>
+              <li>Give it a clear task and let it run</li>
+            </ul>
+            <a class="tool-link" href="https://marketplace.visualstudio.com/items?itemName=Anthropic.claude-code" target="_blank">VS Code Extension &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Claude Code CLI -->
+        <div class="tool-card card-cli reveal">
+          <div class="tool-accent"></div>
+          <div class="tool-head">
+            <div class="tool-head-left">
+              <div class="tool-icon-wrap">&#x1f5a5;</div>
+              <div>
+                <div class="tool-name">Claude Code CLI</div>
+                <div class="tool-tagline">Terminal</div>
+              </div>
+            </div>
+            <span class="tool-badge">Terminal</span>
+          </div>
+          <div class="tool-card-body">
+            <p class="tool-desc">Same power as the IDE extension, but lives in your terminal. Run from any folder and give Claude natural language instructions.</p>
+            <ul class="tool-features">
+              <li>Run from any directory: <code style="font-family:var(--font-mono);font-size:0.75rem;background:var(--cream-deep);padding:0.1rem 0.35rem;border-radius:3px">claude</code></li>
+              <li>One-shot: <code style="font-family:var(--font-mono);font-size:0.75rem;background:var(--cream-deep);padding:0.1rem 0.35rem;border-radius:3px">claude "build me a landing page"</code></li>
+              <li>Reads and writes files in your project</li>
+              <li>Runs shell commands, git, npm</li>
+              <li>Ask it to commit when done</li>
+            </ul>
+            <a class="tool-link" href="https://docs.anthropic.com/en/docs/claude-code" target="_blank">Read docs &rarr;</a>
+          </div>
+        </div>
+
+        <!-- GitHub -->
+        <div class="tool-card card-github reveal">
+          <div class="tool-accent"></div>
+          <div class="tool-head">
+            <div class="tool-head-left">
+              <div class="tool-icon-wrap">&#x1f419;</div>
+              <div>
+                <div class="tool-name">GitHub</div>
+                <div class="tool-tagline">github.com</div>
+              </div>
+            </div>
+            <span class="tool-badge">Version Control</span>
+          </div>
+          <div class="tool-card-body">
+            <p class="tool-desc">Your code's home on the internet. GitHub stores project history, enables collaboration, and bridges Claude Code to Vercel.</p>
+            <ul class="tool-features">
+              <li>Every change is tracked &mdash; always roll back</li>
+              <li>Public repos = free hosting via GitHub Pages</li>
+              <li>Vercel watches your repo and deploys on push</li>
+              <li>Claude Code can commit + push for you</li>
+              <li>Create repos from the CLI in seconds</li>
+            </ul>
+            <a class="tool-link" href="https://github.com/" target="_blank">Open GitHub &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Vercel -->
+        <div class="tool-card card-vercel reveal">
+          <div class="tool-accent"></div>
+          <div class="tool-head">
+            <div class="tool-head-left">
+              <div class="tool-icon-wrap">&#x25b2;</div>
+              <div>
+                <div class="tool-name">Vercel</div>
+                <div class="tool-tagline">vercel.com</div>
+              </div>
+            </div>
+            <span class="tool-badge">Hosting</span>
+          </div>
+          <div class="tool-card-body">
+            <p class="tool-desc">Connect your GitHub repo, get a live URL. Every push auto-builds and deploys your site in under a minute.</p>
+            <ul class="tool-features">
+              <li>Free tier is genuinely usable for projects</li>
+              <li>Preview deployments for every branch / PR</li>
+              <li>Custom domains with one click</li>
+              <li>Works with HTML, React, Next.js, Vue, more</li>
+              <li>Zero-config for most projects</li>
+            </ul>
+            <a class="tool-link" href="https://vercel.com/" target="_blank">Open Vercel &rarr;</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- THE FLOW -->
+  <section class="section section--alt" id="flow">
+    <div class="container">
+      <div class="section-header reveal">
+        <hr class="section-rule">
+        <div class="section-label">03 &mdash; End to End</div>
+        <h2 class="section-title">Idea to live URL</h2>
+        <p class="section-desc">The actual sequence from "I have an idea" to "here's the link."</p>
+      </div>
+
+      <div class="flow-track">
+
+        <div class="flow-step step-coral reveal">
+          <div class="flow-num">1</div>
+          <div class="flow-body">
+            <div class="flow-title">
+              Brainstorm in Claude Chat
+              <span class="flow-chip">claude.ai</span>
+            </div>
+            <p class="flow-text">Describe what you want to build. Get help planning the structure, stack, features, and copy. Use artifacts to prototype ideas visually &mdash; no code on your machine yet.</p>
+          </div>
+        </div>
+
+        <div class="flow-step step-amber reveal">
+          <div class="flow-num">2</div>
+          <div class="flow-body">
+            <div class="flow-title">
+              Set up with Cowork
+              <span class="flow-chip">Desktop</span>
+            </div>
+            <p class="flow-text">Use Cowork to organize project files, move assets, or run light automation on your local machine &mdash; without opening a terminal.</p>
+          </div>
+        </div>
+
+        <div class="flow-step step-blue reveal">
+          <div class="flow-num">3</div>
+          <div class="flow-body">
+            <div class="flow-title">
+              Build with Claude Code
+              <span class="flow-chip">Terminal</span>
+            </div>
+            <p class="flow-text">Create a project folder, open your terminal, and run Claude Code. Give it your plan from step 1 and watch it build the files.</p>
+            <div class="flow-code">
+              <span class="comment"># install once</span><br>
+              <span class="cmd">npm install -g @anthropic-ai/claude-code</span><br><br>
+              <span class="comment"># run it in your project</span><br>
+              <span class="cmd">mkdir my-project && cd my-project</span><br>
+              <span class="cmd">claude</span> <span class="str">"build a portfolio site with hero, about, and contact"</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-step step-green reveal">
+          <div class="flow-num">4</div>
+          <div class="flow-body">
+            <div class="flow-title">
+              Review &amp; iterate
+              <span class="flow-chip">Claude Code</span>
+            </div>
+            <p class="flow-text">Open the files in VS Code. Use the Claude Code extension to tweak, fix, and refine. Keep prompting until it's right &mdash; Claude remembers your project context.</p>
+          </div>
+        </div>
+
+        <div class="flow-step step-ink reveal">
+          <div class="flow-num">5</div>
+          <div class="flow-body">
+            <div class="flow-title">
+              Push to GitHub
+              <span class="flow-chip">git</span>
+            </div>
+            <p class="flow-text">Initialize a repo and push your code. You can ask Claude Code to handle the git init, commit, and push &mdash; or do it yourself.</p>
+            <div class="flow-code">
+              <span class="cmd">git init</span><br>
+              <span class="cmd">git add .</span> <span class="cmd">&&</span> <span class="cmd">git commit</span> <span class="str">-m "initial build"</span><br>
+              <span class="cmd">git remote add origin</span> <span class="str">https://github.com/you/my-project.git</span><br>
+              <span class="cmd">git push -u origin main</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-step step-violet reveal">
+          <div class="flow-num">6</div>
+          <div class="flow-body">
+            <div class="flow-title">
+              Deploy on Vercel
+              <span class="flow-chip">vercel.com</span>
+            </div>
+            <p class="flow-text">Go to vercel.com, import your GitHub repo, click Deploy. You get a shareable URL within 60 seconds &mdash; and every future push auto-deploys.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICKSTART -->
+  <section class="section" id="start">
+    <div class="container">
+      <div class="section-header reveal">
+        <hr class="section-rule">
+        <div class="section-label">04 &mdash; Jump In</div>
+        <h2 class="section-title">Get started today</h2>
+        <p class="section-desc">Pick your entry point based on where you're at.</p>
+      </div>
+
+      <div class="qs-grid">
+        <div class="qs-card reveal">
+          <h4><span class="qs-dot" style="background:var(--coral)"></span> Never used AI tools</h4>
+          <ol class="qs-steps">
+            <li>Go to <a href="https://claude.ai" target="_blank" style="color:var(--coral);text-decoration:none;font-weight:600">claude.ai</a> and sign up (free)</li>
+            <li>Start a conversation: "Help me plan a portfolio website"</li>
+            <li>Try creating an artifact &mdash; ask for a mockup or mini-app</li>
+            <li>Download the desktop app for Cowork</li>
+          </ol>
+        </div>
+
+        <div class="qs-card reveal">
+          <h4><span class="qs-dot" style="background:var(--blue)"></span> Ready to build</h4>
+          <ol class="qs-steps">
+            <li>Install Node.js from <a href="https://nodejs.org" target="_blank" style="color:var(--blue);text-decoration:none;font-weight:600">nodejs.org</a></li>
+            <li>Run <span class="qs-code">npm install -g @anthropic-ai/claude-code</span></li>
+            <li>Create a folder and run <span class="qs-code">claude</span> inside it</li>
+            <li>Describe what you want &mdash; Claude builds it</li>
+          </ol>
+        </div>
+
+        <div class="qs-card reveal">
+          <h4><span class="qs-dot" style="background:var(--ink)"></span> Built something, want to ship</h4>
+          <ol class="qs-steps">
+            <li>Create a <a href="https://github.com" target="_blank" style="color:var(--ink);text-decoration:none;font-weight:600">GitHub</a> account (free)</li>
+            <li>Ask Claude Code: <span class="qs-code">create a github repo and push</span></li>
+            <li>Go to <a href="https://vercel.com" target="_blank" style="color:var(--violet);text-decoration:none;font-weight:600">vercel.com</a>, import the repo</li>
+            <li>Click Deploy &rarr; share the URL</li>
+          </ol>
+        </div>
+
+        <div class="qs-card reveal">
+          <h4><span class="qs-dot" style="background:var(--green)"></span> Want to level up</h4>
+          <ol class="qs-steps">
+            <li>Install the Claude Code <a href="https://marketplace.visualstudio.com/items?itemName=Anthropic.claude-code" target="_blank" style="color:var(--green);text-decoration:none;font-weight:600">VS Code extension</a></li>
+            <li>Add a <span class="qs-code">CLAUDE.md</span> to your project root</li>
+            <li>Try multi-file tasks: "refactor this into components"</li>
+            <li>Explore MCP servers for extra capabilities</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Tips -->
+      <div class="tips-grid" style="margin-top:3rem">
+        <div class="tip-card reveal">
+          <div class="tip-icon" style="background:rgba(232,93,58,0.08)">&#x1f4a1;</div>
+          <div class="tip-title">Start with Chat</div>
+          <div class="tip-text">You don't need to code to start. Use Claude.ai Chat to think through ideas, write copy, and plan before touching any tools.</div>
+        </div>
+        <div class="tip-card reveal">
+          <div class="tip-icon" style="background:rgba(45,91,255,0.08)">&#x1f3af;</div>
+          <div class="tip-title">Be specific</div>
+          <div class="tip-text">The more detail you give Claude Code, the better the output. "Build a contact form with name, email, and message" beats "make a form."</div>
+        </div>
+        <div class="tip-card reveal">
+          <div class="tip-icon" style="background:rgba(26,143,106,0.08)">&#x1f504;</div>
+          <div class="tip-title">Iterate fast</div>
+          <div class="tip-text">Don't aim for perfect on the first try. Ship a v1, get feedback, then prompt Claude to improve it. Each push to GitHub auto-deploys.</div>
+        </div>
+      </div>
+
+      <!-- CTA Banner -->
+      <div class="callout reveal">
+        <div class="callout-text">
+          <div class="callout-title">Ready to ship something?</div>
+          <div class="callout-desc">Open Claude.ai and describe what you want to build. You're 6 steps from a live URL.</div>
+        </div>
+        <a href="https://claude.ai" target="_blank" class="callout-btn">
+          Open Claude
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-mark">Claude &rarr; Prod</div>
+    <div class="footer-text">Built with Claude &middot; 2026</div>
+  </footer>
+
+  <!-- SCROLL REVEAL -->
+  <script>
+    const reveals = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry, i) => {
+        if (entry.isIntersecting) {
+          // Stagger siblings that become visible at roughly the same time
+          const delay = entry.target.dataset.delay || 0;
+          setTimeout(() => {
+            entry.target.classList.add('visible');
+          }, delay);
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    reveals.forEach((el, i) => {
+      // Auto-stagger within same parent
+      const siblings = el.parentElement.querySelectorAll('.reveal');
+      const index = Array.from(siblings).indexOf(el);
+      el.dataset.delay = index * 80;
+      observer.observe(el);
+    });
+  </script>
+
+</body>
+</html>

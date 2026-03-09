@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude to Production</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,800;0,9..144,900;1,9..144,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #FDFAF6;
+      --cream-deep: #F0EBE3;
+      --ink: #1a1a2e;
+      --ink-light: #3d3d56;
+      --muted: #8B8B8B;
+      --muted-light: #B5B5B5;
+      --rule: #DDD6CA;
+      --coral: #E85D3A;
+      --blue: #2D5BFF;
+      --green: #1A8F6A;
+      --violet: #7C5CFC;
+      --amber: #D4940A;
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+    }
+    ::selection { background: var(--coral); color: white; }
+
+    /* Grain */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.028'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 9999; opacity: 0.5;
+    }
+
+    /* ── REUSABLE CLAUDE LOGO SVG ── */
+    .claude-logo { display: inline-block; vertical-align: middle; }
+
+    /* Claude spark: the real logomark */
+    .claude-spark {
+      --spark-color: #D97757;
+    }
+
+    /* ── TOP BAR ── */
+    .top-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      padding: 1rem 2rem;
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(253,250,246,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--rule);
+    }
+    .logo {
+      font-family: var(--font-display); font-size: 0.95rem; font-weight: 800;
+      color: var(--ink); text-decoration: none;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .logo span { color: var(--coral); }
+    .top-links { display: flex; gap: 0.6rem; }
+    .top-link {
+      font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500;
+      color: var(--muted); text-decoration: none; letter-spacing: 0.04em;
+      padding: 0.4rem 0.85rem; border: 1px solid var(--rule);
+      border-radius: 100px; transition: all 0.25s;
+    }
+    .top-link:hover { color: var(--ink); border-color: var(--ink); }
+
+    /* ── HORIZONTAL SCROLL TRACK ── */
+    .htrack {
+      width: 100vw; height: 100vh;
+      overflow-x: auto; overflow-y: hidden;
+      scroll-behavior: smooth;
+      padding-top: 54px; /* top bar height */
+    }
+    .htrack::-webkit-scrollbar { height: 0; }
+    .htrack { scrollbar-width: none; }
+
+    /* ── THE STRIP ── */
+    .strip {
+      display: flex;
+      align-items: stretch;
+      height: calc(100vh - 54px);
+      width: max-content;
+    }
+
+    /* ── COLUMN (each node) ── */
+    .col {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 2.5rem 0;
+      flex-shrink: 0;
+    }
+
+    /* ── TITLE COLUMN ── */
+    .col-title {
+      width: 420px;
+      padding: 3rem 3rem 3rem 4rem;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .title-eyebrow {
+      font-family: var(--font-mono); font-size: 0.62rem; font-weight: 500;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--coral);
+      margin-bottom: 1.25rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .title-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--coral);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+    .title-h1 {
+      font-family: var(--font-display);
+      font-size: 3.4rem; font-weight: 900;
+      line-height: 0.92; letter-spacing: -0.04em;
+      margin-bottom: 1rem;
+    }
+    .title-h1 em { font-style: italic; font-weight: 600; color: var(--coral); }
+    .title-sub {
+      font-size: 1rem; font-weight: 300; color: var(--muted);
+      line-height: 1.7; max-width: 320px; margin-bottom: 2rem;
+    }
+    .scroll-hint {
+      display: flex; align-items: center; gap: 0.5rem;
+      color: var(--muted-light); font-family: var(--font-mono);
+      font-size: 0.65rem; letter-spacing: 0.06em;
+      animation: bobRight 2s ease-in-out infinite;
+    }
+    @keyframes bobRight {
+      0%,100% { transform: translateX(0); }
+      50% { transform: translateX(6px); }
+    }
+
+    /* ── ARROW COLUMN ── */
+    .col-arrow {
+      width: 120px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 0.4rem;
+    }
+    .arrow-line-wrap {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .arrow-svg { overflow: visible; }
+    .arrow-label {
+      font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      color: var(--muted); text-align: center; line-height: 1.4;
+      white-space: nowrap;
+    }
+    @keyframes dashMove {
+      to { stroke-dashoffset: -16; }
+    }
+
+    /* ── NODE COLUMN ── */
+    .col-node {
+      width: 340px;
+    }
+
+    /* ── NODE CARD ── */
+    .ncard {
+      width: 290px;
+      background: white;
+      border: 1.5px solid var(--rule);
+      border-radius: 24px;
+      overflow: hidden;
+      transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94),
+                  box-shadow 0.4s;
+      cursor: default;
+    }
+    .ncard:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 60px rgba(26,26,46,0.1);
+    }
+    .ncard-top {
+      padding: 2rem 2rem 0;
+      position: relative;
+    }
+    .ncard-accent {
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+    .ncard-icon-wrap {
+      width: 64px; height: 64px; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    .ncard-phase {
+      font-family: var(--font-mono); font-size: 0.6rem; font-weight: 500;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 0.5rem;
+      display: flex; align-items: center; gap: 0.45rem;
+    }
+    .ncard-phase-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .ncard-name {
+      font-family: var(--font-display); font-weight: 800;
+      font-size: 1.6rem; letter-spacing: -0.03em;
+      line-height: 1.05; margin-bottom: 0.5rem;
+    }
+    .ncard-desc {
+      font-size: 0.88rem; color: var(--ink-light);
+      line-height: 1.6; margin-bottom: 1.25rem;
+    }
+    .ncard-body {
+      padding: 0 2rem 1.75rem;
+    }
+    .ncard-pills {
+      display: flex; flex-wrap: wrap; gap: 0.35rem;
+    }
+    .npill {
+      font-family: var(--font-mono); font-size: 0.58rem; font-weight: 500;
+      letter-spacing: 0.02em; padding: 0.25rem 0.65rem;
+      border-radius: 100px; border: 1px solid; white-space: nowrap;
+    }
+
+    /* ── GROUPED NODE (Claude Desktop) ── */
+    .col-group { width: 460px; }
+    .ncard-group {
+      width: 400px;
+      background: white;
+      border: 1.5px solid var(--rule);
+      border-radius: 24px;
+      overflow: hidden;
+      transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.4s;
+    }
+    .ncard-group:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 60px rgba(26,26,46,0.1);
+    }
+    .ncard-group-header {
+      padding: 2rem 2rem 1.5rem;
+      border-bottom: 1px solid var(--rule);
+      position: relative;
+    }
+    .ncard-group-header .ncard-accent { border-radius: 24px 24px 0 0; }
+    .ncard-group-title {
+      font-family: var(--font-display); font-weight: 800;
+      font-size: 1.6rem; letter-spacing: -0.03em;
+      margin-bottom: 0.25rem;
+      display: flex; align-items: center; gap: 0.65rem;
+    }
+    .ncard-group-sub {
+      font-size: 0.88rem; color: var(--muted); line-height: 1.5;
+    }
+    .ncard-group-items {
+      display: flex;
+      border-top: none;
+    }
+    .gitem {
+      flex: 1;
+      text-align: center;
+      padding: 1.5rem 1rem;
+      border-right: 1px solid var(--rule);
+      transition: background 0.25s;
+      cursor: default;
+    }
+    .gitem:last-child { border-right: none; }
+    .gitem:hover { background: rgba(0,0,0,0.015); }
+    .gitem-icon { font-size: 1.8rem; display: block; margin-bottom: 0.5rem; }
+    .gitem-name {
+      font-family: var(--font-display); font-size: 0.95rem;
+      font-weight: 700; margin-bottom: 0.2rem;
+    }
+    .gitem-role {
+      font-family: var(--font-mono); font-size: 0.55rem; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .gitem-desc {
+      font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem;
+      line-height: 1.45;
+    }
+
+    /* ── LIVE URL NODE ── */
+    .ncard-live {
+      width: 300px;
+      background: var(--ink);
+      border: 1.5px solid rgba(255,255,255,0.08);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      color: var(--cream);
+      transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.4s;
+    }
+    .ncard-live:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 24px 64px rgba(26,26,46,0.3);
+    }
+    .ncard-live .ncard-phase { color: var(--green); }
+    .ncard-live .ncard-name { color: var(--cream); font-size: 1.8rem; }
+    .ncard-live .ncard-desc { color: #8B8FA4; }
+    .live-url-bar {
+      margin-top: 1rem;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 0.65rem 1rem;
+      font-family: var(--font-mono); font-size: 0.72rem;
+      color: var(--green);
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    .live-browser {
+      margin-top: 1.25rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .live-browser-bar {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.5rem 0.75rem;
+      background: rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .live-browser-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .live-browser-body {
+      padding: 1rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .live-browser-line {
+      height: 6px; border-radius: 3px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    /* ── END COLUMN ── */
+    .col-end {
+      width: 300px;
+      padding: 3rem 4rem 3rem 2rem;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .end-title {
+      font-family: var(--font-display);
+      font-size: 2rem; font-weight: 900;
+      letter-spacing: -0.03em; line-height: 1;
+      margin-bottom: 0.75rem;
+    }
+    .end-title em { font-style: italic; font-weight: 600; color: var(--coral); }
+    .end-desc {
+      font-size: 0.88rem; color: var(--muted); line-height: 1.65;
+      margin-bottom: 1.5rem;
+    }
+    .end-cta {
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      padding: 0.8rem 1.5rem; background: var(--coral); color: white;
+      font-family: var(--font-body); font-weight: 600; font-size: 0.85rem;
+      text-decoration: none; border-radius: 100px; transition: all 0.3s;
+    }
+    .end-cta:hover {
+      background: #d14e2d; transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(232,93,58,0.3);
+    }
+    .end-link {
+      display: block; margin-top: 1rem;
+      font-family: var(--font-mono); font-size: 0.65rem;
+      color: var(--muted); text-decoration: none;
+      letter-spacing: 0.03em; transition: color 0.2s;
+    }
+    .end-link:hover { color: var(--ink); }
+
+    /* ── PROGRESS BAR ── */
+    .progress {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: 3px; background: var(--rule); z-index: 200;
+    }
+    .progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--coral), var(--amber), var(--blue), var(--ink), var(--violet), var(--green));
+      transition: width 0.15s;
+    }
+
+    /* ── ENTRANCE ANIMATIONS ── */
+    .col {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.55s cubic-bezier(0.25,0.46,0.45,0.94),
+                  transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94);
+    }
+    .col.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-height: 650px) {
+      .ncard { width: 250px; }
+      .ncard-top { padding: 1.5rem 1.5rem 0; }
+      .ncard-body { padding: 0 1.5rem 1.25rem; }
+      .ncard-icon-wrap { width: 48px; height: 48px; border-radius: 12px; }
+      .ncard-name { font-size: 1.3rem; }
+      .ncard-group { width: 360px; }
+      .col-group { width: 400px; }
+      .gitem { padding: 1rem 0.75rem; }
+      .col-title { width: 360px; }
+      .title-h1 { font-size: 2.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <a href="index.html" class="logo">
+      <svg class="claude-spark" width="22" height="22" viewBox="0 0 100 100" fill="none">
+        <!-- Claude spark logomark - 12 radiating teardrop petals -->
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(0 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(30 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(60 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(90 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(120 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(150 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(180 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(210 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(240 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(270 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(300 50 50)"/>
+        <ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(330 50 50)"/>
+      </svg>
+      Claude <span>&rarr;</span> Prod
+    </a>
+    <div class="top-links">
+      <a href="details.html" class="top-link">Full guide &rarr;</a>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+
+  <!-- ════════════════════════════════════ -->
+  <!-- HORIZONTAL TRACK                    -->
+  <!-- ════════════════════════════════════ -->
+  <div class="htrack" id="htrack">
+    <div class="strip">
+
+      <!-- ── TITLE ── -->
+      <div class="col col-title" data-col="0">
+        <div class="title-eyebrow"><span class="title-dot"></span> Your AI Dev Stack</div>
+        <h1 class="title-h1">From idea<br>to <em>live link.</em></h1>
+        <p class="title-sub">Claude AI, GitHub, and Vercel form one connected pipeline. Scroll to see how each piece fits.</p>
+        <div class="scroll-hint">
+          Scroll
+          <svg width="20" height="12" viewBox="0 0 20 12" fill="none"><path d="M1 6h18M14 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+
+      <!-- ── ARROW: title → claude desktop ── -->
+      <div class="col col-arrow" data-col="0.5">
+        <svg class="arrow-svg" width="80" height="24" viewBox="0 0 80 24">
+          <line x1="0" y1="12" x2="68" y2="12" stroke="var(--rule)" stroke-width="2" stroke-dasharray="6 4" style="animation: dashMove 1s linear infinite"/>
+          <polygon points="66,6 78,12 66,18" fill="var(--rule)"/>
+        </svg>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <!-- 01: CLAUDE DESKTOP                  -->
+      <!-- ═══════════════════════════════════ -->
+      <div class="col col-group" data-col="1">
+        <div class="ncard-group">
+          <div class="ncard-group-header">
+            <div class="ncard-accent" style="background: linear-gradient(90deg, var(--coral), var(--amber), var(--blue));"></div>
+            <div class="ncard-phase" style="color:var(--coral);">
+              <span class="ncard-phase-dot" style="background:var(--coral);"></span>
+              Step 01
+            </div>
+            <div class="ncard-group-title">
+              <svg class="claude-spark" width="28" height="28" viewBox="0 0 100 100"><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(0 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(30 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(60 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(90 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(120 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(150 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(180 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(210 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(240 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(270 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(300 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="#D97757" transform="rotate(330 50 50)"/></svg>
+              Claude Desktop
+            </div>
+            <div class="ncard-group-sub">Your creative AI hub &mdash; three modes in one app</div>
+          </div>
+          <div class="ncard-group-items">
+            <div class="gitem" style="color: var(--coral);">
+              <span class="gitem-icon">&#x1f4ac;</span>
+              <div class="gitem-name">Chat</div>
+              <div class="gitem-role">Ideate</div>
+              <div class="gitem-desc">Brainstorm, write, plan, research</div>
+            </div>
+            <div class="gitem" style="color: var(--amber);">
+              <span class="gitem-icon">&#x1f91d;</span>
+              <div class="gitem-name">Cowork</div>
+              <div class="gitem-role">Collaborate</div>
+              <div class="gitem-desc">Files, tasks, desktop automation</div>
+            </div>
+            <div class="gitem" style="color: var(--blue);">
+              <span class="gitem-icon">&#x26a1;</span>
+              <div class="gitem-name">Code</div>
+              <div class="gitem-role">Create</div>
+              <div class="gitem-desc">Generate code, build projects</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="col col-arrow" data-col="1.5">
+        <div class="arrow-label">generates<br>code</div>
+        <svg class="arrow-svg" width="80" height="24" viewBox="0 0 80 24">
+          <line x1="0" y1="12" x2="68" y2="12" stroke="var(--coral)" stroke-width="2" stroke-dasharray="6 4" style="animation: dashMove 1s linear infinite"/>
+          <polygon points="66,6 78,12 66,18" fill="var(--coral)"/>
+        </svg>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <!-- 02: CLAUDE CODE CLI                 -->
+      <!-- ═══════════════════════════════════ -->
+      <div class="col col-node" data-col="2">
+        <div class="ncard">
+          <div class="ncard-top">
+            <div class="ncard-accent" style="background: var(--blue);"></div>
+            <div class="ncard-icon-wrap" style="background: rgba(45,91,255,0.08);">
+              <svg class="claude-spark" width="32" height="32" viewBox="0 0 100 100"><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(0 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(30 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(60 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(90 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(120 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(150 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(180 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(210 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(240 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(270 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(300 50 50)"/><ellipse cx="50" cy="20" rx="4.5" ry="16" fill="var(--blue)" transform="rotate(330 50 50)"/></svg>
+            </div>
+            <div class="ncard-phase" style="color:var(--blue);">
+              <span class="ncard-phase-dot" style="background:var(--blue);"></span>
+              Step 02 &mdash; Build
+            </div>
+            <div class="ncard-name">Claude Code</div>
+            <div class="ncard-desc">AI agent in your terminal or IDE. Writes code, edits files, runs commands &mdash; from natural language.</div>
+          </div>
+          <div class="ncard-body">
+            <div class="ncard-pills">
+              <span class="npill" style="border-color:rgba(45,91,255,0.2);color:var(--blue);background:rgba(45,91,255,0.04);">writes files</span>
+              <span class="npill" style="border-color:rgba(45,91,255,0.2);color:var(--blue);background:rgba(45,91,255,0.04);">runs tests</span>
+              <span class="npill" style="border-color:rgba(45,91,255,0.2);color:var(--blue);background:rgba(45,91,255,0.04);">refactors</span>
+              <span class="npill" style="border-color:rgba(45,91,255,0.2);color:var(--blue);background:rgba(45,91,255,0.04);">multi-file edits</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="col col-arrow" data-col="2.5">
+        <div class="arrow-label">writes &amp;<br>commits</div>
+        <svg class="arrow-svg" width="80" height="24" viewBox="0 0 80 24">
+          <line x1="0" y1="12" x2="68" y2="12" stroke="var(--blue)" stroke-width="2" stroke-dasharray="6 4" style="animation: dashMove 1s linear infinite"/>
+          <polygon points="66,6 78,12 66,18" fill="var(--blue)"/>
+        </svg>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <!-- 03: LOCAL FILES + GIT               -->
+      <!-- ═══════════════════════════════════ -->
+      <div class="col col-node" data-col="3">
+        <div class="ncard">
+          <div class="ncard-top">
+            <div class="ncard-accent" style="background: var(--ink); opacity:0.5;"></div>
+            <div class="ncard-icon-wrap" style="background: rgba(26,26,46,0.05);">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="11" x2="12" y2="17"/>
+                <line x1="9" y1="14" x2="15" y2="14"/>
+              </svg>
+            </div>
+            <div class="ncard-phase" style="color:var(--ink-light);">
+              <span class="ncard-phase-dot" style="background:var(--ink);"></span>
+              Step 03 &mdash; Version
+            </div>
+            <div class="ncard-name">Local Files<br>&amp; Git</div>
+            <div class="ncard-desc">Your project files and version history, right on your machine. The staging ground before it goes to the cloud.</div>
+          </div>
+          <div class="ncard-body">
+            <div class="ncard-pills">
+              <span class="npill" style="border-color:var(--rule);color:var(--ink-light);background:rgba(26,26,46,0.02);">file system</span>
+              <span class="npill" style="border-color:var(--rule);color:var(--ink-light);background:rgba(26,26,46,0.02);">git history</span>
+              <span class="npill" style="border-color:var(--rule);color:var(--ink-light);background:rgba(26,26,46,0.02);">branches</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="col col-arrow" data-col="3.5">
+        <div class="arrow-label">git push</div>
+        <svg class="arrow-svg" width="80" height="24" viewBox="0 0 80 24">
+          <line x1="0" y1="12" x2="68" y2="12" stroke="var(--ink)" stroke-width="2" stroke-dasharray="6 4" style="animation: dashMove 1s linear infinite"/>
+          <polygon points="66,6 78,12 66,18" fill="var(--ink)" opacity="0.6"/>
+        </svg>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <!-- 04: GITHUB                          -->
+      <!-- ═══════════════════════════════════ -->
+      <div class="col col-node" data-col="4">
+        <div class="ncard">
+          <div class="ncard-top">
+            <div class="ncard-accent" style="background: var(--ink);"></div>
+            <div class="ncard-icon-wrap" style="background: rgba(26,26,46,0.05);">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="var(--ink)">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.605-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12 24 5.37 18.63 0 12 0z"/>
+              </svg>
+            </div>
+            <div class="ncard-phase" style="color:var(--ink);">
+              <span class="ncard-phase-dot" style="background:var(--ink);"></span>
+              Step 04 &mdash; Share
+            </div>
+            <div class="ncard-name">GitHub</div>
+            <div class="ncard-desc">Your code's home in the cloud. Stores history, enables collaboration, and triggers deployments.</div>
+          </div>
+          <div class="ncard-body">
+            <div class="ncard-pills">
+              <span class="npill" style="border-color:var(--rule);color:var(--ink-light);background:rgba(26,26,46,0.02);">repository</span>
+              <span class="npill" style="border-color:var(--rule);color:var(--ink-light);background:rgba(26,26,46,0.02);">webhooks</span>
+              <span class="npill" style="border-color:var(--rule);color:var(--ink-light);background:rgba(26,26,46,0.02);">collaboration</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="col col-arrow" data-col="4.5">
+        <div class="arrow-label">auto-<br>deploys</div>
+        <svg class="arrow-svg" width="80" height="24" viewBox="0 0 80 24">
+          <line x1="0" y1="12" x2="68" y2="12" stroke="var(--violet)" stroke-width="2" stroke-dasharray="6 4" style="animation: dashMove 1s linear infinite"/>
+          <polygon points="66,6 78,12 66,18" fill="var(--violet)"/>
+        </svg>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <!-- 05: VERCEL                          -->
+      <!-- ═══════════════════════════════════ -->
+      <div class="col col-node" data-col="5">
+        <div class="ncard">
+          <div class="ncard-top">
+            <div class="ncard-accent" style="background: var(--violet);"></div>
+            <div class="ncard-icon-wrap" style="background: rgba(124,92,252,0.08);">
+              <svg width="28" height="24" viewBox="0 0 76 65" fill="var(--violet)">
+                <path d="M37.5274 0L75.0548 65H0L37.5274 0Z"/>
+              </svg>
+            </div>
+            <div class="ncard-phase" style="color:var(--violet);">
+              <span class="ncard-phase-dot" style="background:var(--violet);"></span>
+              Step 05 &mdash; Deploy
+            </div>
+            <div class="ncard-name">Vercel</div>
+            <div class="ncard-desc">Connect repo, click deploy. Live URL in 60 seconds. Every push auto-builds and ships.</div>
+          </div>
+          <div class="ncard-body">
+            <div class="ncard-pills">
+              <span class="npill" style="border-color:rgba(124,92,252,0.2);color:var(--violet);background:rgba(124,92,252,0.04);">auto-build</span>
+              <span class="npill" style="border-color:rgba(124,92,252,0.2);color:var(--violet);background:rgba(124,92,252,0.04);">CDN</span>
+              <span class="npill" style="border-color:rgba(124,92,252,0.2);color:var(--violet);background:rgba(124,92,252,0.04);">preview URLs</span>
+              <span class="npill" style="border-color:rgba(124,92,252,0.2);color:var(--violet);background:rgba(124,92,252,0.04);">custom domains</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ARROW ── -->
+      <div class="col col-arrow" data-col="5.5">
+        <div class="arrow-label">live!</div>
+        <svg class="arrow-svg" width="80" height="24" viewBox="0 0 80 24">
+          <line x1="0" y1="12" x2="68" y2="12" stroke="var(--green)" stroke-width="2.5"/>
+          <polygon points="66,6 78,12 66,18" fill="var(--green)"/>
+        </svg>
+      </div>
+
+      <!-- ═══════════════════════════════════ -->
+      <!-- 06: SHAREABLE LINK                  -->
+      <!-- ═══════════════════════════════════ -->
+      <div class="col col-node" data-col="6">
+        <div class="ncard-live">
+          <div class="ncard-phase">
+            <span class="ncard-phase-dot" style="background:var(--green);"></span>
+            <span style="color:var(--green);">Live</span>
+          </div>
+          <div class="ncard-name" style="margin-bottom:0.5rem;">Shareable<br>Link</div>
+          <div class="ncard-desc">Your project is live on the internet. Share the URL with anyone, anywhere.</div>
+          <div class="live-url-bar">
+            <span class="live-dot"></span>
+            my-project.vercel.app
+          </div>
+          <div class="live-browser">
+            <div class="live-browser-bar">
+              <span class="live-browser-dot" style="background:#E85D3A;"></span>
+              <span class="live-browser-dot" style="background:#D4940A;"></span>
+              <span class="live-browser-dot" style="background:#1A8F6A;"></span>
+            </div>
+            <div class="live-browser-body">
+              <div class="live-browser-line" style="width:60%;"></div>
+              <div class="live-browser-line" style="width:85%;"></div>
+              <div class="live-browser-line" style="width:40%;"></div>
+              <div class="live-browser-line" style="width:70%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── END ── -->
+      <div class="col col-end" data-col="7">
+        <div class="end-title">That's<br><em>the flow.</em></div>
+        <p class="end-desc">Six steps from "I have an idea" to "here's the link." Start with Claude Chat, end with a live URL.</p>
+        <a href="https://claude.ai" target="_blank" class="end-cta">
+          Open Claude
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+        <a href="details.html" class="end-link">Read the full guide with setup steps &rarr;</a>
+      </div>
+
+    </div><!-- /strip -->
+  </div><!-- /htrack -->
+
+  <script>
+    const htrack = document.getElementById('htrack');
+    const progressFill = document.getElementById('progressFill');
+    const cols = document.querySelectorAll('.col');
+
+    // Progress bar
+    htrack.addEventListener('scroll', () => {
+      const max = htrack.scrollWidth - htrack.clientWidth;
+      const pct = max > 0 ? (htrack.scrollLeft / max) * 100 : 0;
+      progressFill.style.width = pct + '%';
+    }, { passive: true });
+
+    // Translate ALL scroll input → horizontal
+    // Capture on window to ensure we catch everything
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      // Use both deltaX and deltaY so trackpad, mouse wheel, etc all work
+      htrack.scrollLeft += (e.deltaY !== 0 ? e.deltaY : e.deltaX);
+    }, { passive: false });
+
+    // Keyboard nav
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') { htrack.scrollLeft += 400; }
+      if (e.key === 'ArrowLeft') { htrack.scrollLeft -= 400; }
+    });
+
+    // Intersection observer for entrance animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { root: htrack, threshold: 0.15 });
+
+    cols.forEach(col => observer.observe(col));
+
+    // Animate dash flow
+    const style = document.createElement('style');
+    style.textContent = '@keyframes dashMove { to { stroke-dashoffset: -16; } }';
+    document.head.appendChild(style);
+  </script>
+
+</body>
+</html>
